@@ -1,17 +1,25 @@
 {
   "name": "smart-upsell-checkout-agent",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Autonomous AI Upsell Evaluation & Guardrail Checkout Agent",
+  "main": "server.js",
   "scripts": {
+    "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.121.0",
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "razorpay": "^2.9.8"
   }
 }

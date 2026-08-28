@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Upsell Checkout Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --accent-purple: #8b5cf6;
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1fr solid var(--card-border);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-icon {
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      background: linear-gradient(to right, #ffffff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .btn-reset {
+      background: #334155;
+      color: var(--text-main);
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-reset:hover {
+      background: #475569;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 850px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    .card-title {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .cart-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .cart-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.75rem 1rem;
+      background: #0f172a;
+      border-radius: 10px;
+      border: 1px solid #1e293b;
+    }
+
+    .cart-item-name {
+      font-weight: 500;
+    }
+
+    .cart-item-price {
+      font-weight: 600;
+      color: var(--accent-green);
+    }
+
+    .cart-summary {
+      border-top: 1px solid var(--card-border);
+      padding-top: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .cart-total-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    /* Session Cap Progress Bar */
+    .session-cap-box {
+      background: #0f172a;
+      border-radius: 12px;
+      padding: 1rem;
+      border: 1px solid #334155;
+      margin-top: 1rem;
+    }
+
+    .cap-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-bar-bg {
+      background: #334155;
+      height: 8px;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      background: linear-gradient(to right, var(--accent-blue), var(--accent-purple));
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    /* Upsell Banner */
+    .upsell-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+
+    .btn-action {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+      color: white;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #334155;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #475569;
+    }
+
+    .btn-checkout {
+      width: 100%;
+      padding: 1rem;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      font-size: 1.1rem;
+      border-radius: 12px;
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-checkout:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);
+    }
+
+    /* Evaluation Result Box */
+    .eval-box {
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .badge-auto {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+    }
+
+    .badge-manual {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--accent-amber);
+      border: 1px solid var(--accent-amber);
+    }
+
+    .badge-danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+
+    .eval-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .eval-reason {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      font-style: italic;
+    }
+
+    .eval-buttons {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn-accept {
+      background: var(--accent-green);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-decline {
+      background: var(--accent-red);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Razorpay Modal / Result */
+    .razorpay-result {
+      background: #064e3b;
+      border: 1px solid #10b981;
+      border-radius: 12px;
+      padding: 1rem;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    /* Audit Logs */
+    .logs-container {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 1rem;
+      max-height: 350px;
+      overflow-y: auto;
+      color: #cbd5e1;
+    }
+
+    .log-item {
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .log-item:last-child {
+      border-bottom: none;
+    }
+
+    .log-time {
+      color: #64748b;
+    }
+
+    .log-auto {
+      color: var(--accent-green);
+    }
+
+    .log-needs {
+      color: var(--accent-amber);
+    }
+
+    .log-unavailable {
+      color: var(--accent-red);
+      font-weight: bold;
+    }
+
+    .log-accept {
+      color: #34d399;
+      font-weight: bold;
+    }
+
+    .log-reject {
+      color: #f87171;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">
+        <div class="logo-icon">🤖</div>
+        <div>
+          <h1>Smart Upsell Checkout Agent</h1>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Gemini AI Agent + Razorpay + Guardrails</p>
+        </div>
+      </div>
+      <button class="btn-reset" onclick="resetSession()">🔄 Reset Session</button>
+    </header>
+
+    <!-- Simulated Failure Mode Banner -->
+    <div id="simulated-failure-banner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-red); color: #fca5a5; padding: 0.6rem 1rem; border-radius: 10px; margin-bottom: 1.5rem; font-size: 0.9rem;">
+      ⚠️ <strong>Simulated Failure Mode Active (?simulateFailure=true)</strong>: Gemini API calls will simulate temporary unavailability to verify graceful app degradation. Cart and checkout remain 100% operational.
+    </div>
+
+    <div class="grid">
+      <!-- Left Column: Cart & Checkout -->
+      <div>
+        <div class="card">
+          <div class="card-title">
+            <span>🛒 Shopping Cart</span>
+            <span id="item-count-badge" style="font-size: 0.85rem; color: var(--text-muted);">2 Items</span>
+          </div>
+
+          <div class="cart-list" id="cart-items">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <div class="cart-summary">
+            <div class="cart-total-row">
+              <span>Cart Total:</span>
+              <span id="cart-total" style="color: var(--accent-green);">₹3,500</span>
+            </div>
+          </div>
+
+          <!-- Session Cap Tracker -->
+          <div class="session-cap-box">
+            <div class="cap-header">
+              <span>🛡️ Session Auto-Approval Cap (20% of Initial Total)</span>
+              <span id="cap-text">₹0 / ₹700</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="cap-progress" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.5rem;">
+            <button class="btn-checkout" onclick="triggerCheckout()">💳 Pay & Checkout with Razorpay</button>
+          </div>
+
+          <!-- Razorpay Result Box -->
+          <div class="razorpay-result" id="razorpay-result">
+            <h4 style="margin-bottom: 0.5rem; color: #6ee7b7;">🎉 Razorpay Test Order Created!</h4>
+            <p style="font-size: 0.9rem;">Order ID: <strong id="rzp-order-id">-</strong></p>
+            <p style="font-size: 0.9rem;">Amount: <strong id="rzp-amount">-</strong></p>
+            <p style="font-size: 0.9rem;">Receipt: <strong id="rzp-receipt">-</strong></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Agent Evaluation & Logs -->
+      <div>
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <div class="card-title">
+            <span>✨ AI Upsell Agent</span>
+          </div>
+
+          <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">
+            Test the Gemini AI fit recommendation and code guardrails:
+          </p>
+
+          <div class="upsell-actions">
+            <button class="btn-action btn-primary" onclick="evaluateUpsell('standard')" id="btn-eval-std">
+              Evaluate Candidate (Wrist Rest ₹450)
+            </button>
+            <button class="btn-action btn-secondary" onclick="evaluateUpsell('high_value')" id="btn-eval-high">
+              Evaluate High-Value (Monitor Stand ₹1200)
+            </button>
+          </div>
+
+          <!-- Evaluation Card -->
+          <div class="eval-box" id="eval-box" style="display: none;">
+            <div id="eval-badge" class="badge">EVALUATING...</div>
+            <div class="eval-title" id="eval-product-name">-</div>
+            <div class="eval-reason" id="eval-reason">-</div>
+
+            <div class="eval-buttons" id="eval-buttons" style="display: none;">
+              <button class="btn-accept" onclick="respondUpsell('accept')">Accept Upsell</button>
+              <button class="btn-decline" onclick="respondUpsell('reject')">Decline</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Human-Readable Audit Logs Card -->
+        <div class="card">
+          <div class="card-title">
+            <span>📜 Live Audit Logs</span>
+          </div>
+          <div class="logs-container" id="logs-container">
+            <div style="color: var(--text-muted);">No activity logged yet. Trigger an evaluation above!</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentLogId = null;
+    let currentEvaluatedProduct = null;
+
+    // Check for ?simulateFailure=true in window location search
+    const urlParams = new URLSearchParams(window.location.search);
+    const isSimulatedFailureActive = urlParams.get('simulateFailure') === 'true';
+
+    if (isSimulatedFailureActive) {
+      document.getElementById('simulated-failure-banner').style.display = 'block';
+    }
+
+    async function loadCart() {
+      try {
+        const res = await fetch('/api/cart');
+        const data = await res.json();
+        renderCart(data);
+      } catch (err) {
+        console.error('Failed to load cart:', err);
+      }
+    }
+
+    function renderCart(data) {
+      if (!data) return;
+
+      const cartObj = data.cart || data;
+      const items = cartObj.items || [];
+      const subtotal = cartObj.subtotal !== undefined ? cartObj.subtotal : 0;
+      const cap = data.sessionCap || cartObj.sessionCap;
+
+      const itemsContainer = document.getElementById('cart-items');
+      itemsContainer.innerHTML = '';
+
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'cart-item';
+        div.innerHTML = `
+          <span class="cart-item-name">${item.name}</span>
+          <span class="cart-item-price">₹${item.price.toLocaleString()}</span>
+        `;
+        itemsContainer.appendChild(div);
+      });
+
+      document.getElementById('item-count-badge').innerText = `${items.length} Items`;
+      document.getElementById('cart-total').innerText = `₹${subtotal.toLocaleString()}`;
+
+      // Update session cap UI
+      if (cap) {
+        const pct = Math.min(100, (cap.cumulativeAutoApprovedAmount / cap.maxSessionCap) * 100);
+        document.getElementById('cap-progress').style.width = `${pct}%`;
+        document.getElementById('cap-text').innerText = `₹${cap.cumulativeAutoApprovedAmount} / ₹${cap.maxSessionCap}`;
+      }
+    }
+
+    async function evaluateUpsell(type) {
+      const evalBox = document.getElementById('eval-box');
+      evalBox.style.display = 'block';
+      evalBox.style.opacity = '0.6';
+
+      // Clear previous evaluation state immediately to prevent stale text
+      document.getElementById('eval-badge').className = 'badge';
+      document.getElementById('eval-badge').innerText = 'EVALUATING...';
+      document.getElementById('eval-product-name').innerText = 'Evaluating AI recommendation...';
+      document.getElementById('eval-reason').innerText = 'Querying AI model...';
+      document.getElementById('eval-buttons').style.display = 'none';
+
+      const btn = type === 'standard' ? document.getElementById('btn-eval-std') : document.getElementById('btn-eval-high');
+      const originalText = btn.innerText;
+      btn.innerText = 'Evaluating...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/upsell/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            upsellType: type,
+            simulateFailure: isSimulatedFailureActive
+          })
+        });
+        const data = await res.json();
+
+        currentLogId = data.logId;
+        currentEvaluatedProduct = data.product;
+
+        evalBox.style.opacity = '1';
+
+        const guardrail = data.guardrailResult || data.guardrail || {};
+        const aiResult = data.aiResult || data.claudeResult || data.geminiResult || {};
+
+        const badge = document.getElementById('eval-badge');
+
+        if (aiResult.unavailable || data.aiUnavailable) {
+          // Distinct AI service unavailable view
+          badge.className = 'badge badge-danger';
+          badge.innerText = '⚠️ AI SERVICE TEMPORARILY UNAVAILABLE';
+          document.getElementById('eval-product-name').innerText = `${data.product.name} (₹${data.product.price})`;
+          document.getElementById('eval-reason').innerText = 'AI service temporarily unavailable. You can still proceed with cart & checkout normally.';
+          document.getElementById('eval-buttons').style.display = 'none';
+        } else {
+          // Normal AI evaluation result
+          if (guardrail.approvalStatus === 'auto_approved') {
+            badge.className = 'badge badge-auto';
+            badge.innerText = `✅ AUTO-APPROVED (${guardrail.priceRatioPercentage || 'under 20%'} of cart total)`;
+          } else {
+            badge.className = 'badge badge-manual';
+            const reasonMsg = guardrail.overrideReason || `${guardrail.priceRatioPercentage || '>=20%'} of cart total`;
+            badge.innerText = `⚠️ NEEDS APPROVAL (${reasonMsg})`;
+          }
+
+          document.getElementById('eval-product-name').innerText = `${data.product.name} (₹${data.product.price})`;
+          document.getElementById('eval-reason').innerText = `AI Recommendation: ${aiResult.suggest ? 'YES (Recommended)' : 'NO (Not Recommended)'} | Reason: "${aiResult.reason || 'no suggestion available'}"`;
+          document.getElementById('eval-buttons').style.display = 'flex';
+        }
+
+        fetchLogs();
+      } catch (err) {
+        console.error(err);
+      } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+      }
+    }
+
+    async function respondUpsell(action) {
+      if (!currentLogId) return;
+
+      try {
+        const res = await fetch('/api/upsell/respond', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            logId: currentLogId,
+            action,
+            product: currentEvaluatedProduct
+          })
+        });
+        const data = await res.json();
+
+        renderCart(data);
+        document.getElementById('eval-buttons').style.display = 'none';
+        document.getElementById('eval-reason').innerText += ` | Outcome: ${action.toUpperCase()}`;
+
+        fetchLogs();
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function triggerCheckout() {
+      const resBox = document.getElementById('razorpay-result');
+      resBox.style.display = 'block';
+      resBox.style.opacity = '0.6';
+
+      try {
+        const res = await fetch('/api/checkout', { method: 'POST' });
+        const data = await res.json();
+
+        resBox.style.opacity = '1';
+        if (data.success) {
+          document.getElementById('rzp-order-id').innerText = data.order.id;
+          document.getElementById('rzp-amount').innerText = `₹${data.order.amount / 100} ${data.order.currency}`;
+          document.getElementById('rzp-receipt').innerText = data.order.receipt;
+        } else {
+          resBox.innerHTML = `<h4 style="color:#f87171;">Checkout Failed</h4><p>${data.error}</p>`;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function fetchLogs() {
+      try {
+        const res = await fetch('/api/logs');
+        const data = await res.json();
+        const container = document.getElementById('logs-container');
+
+        if (!data.rawLogs || data.rawLogs.length === 0) {
+          container.innerHTML = `<div style="color: var(--text-muted);">No activity logged yet.</div>`;
+          return;
+        }
+
+        container.innerHTML = data.rawLogs.map(l => {
+          if (l.isServiceUnavailable) {
+            return `
+              <div class="log-item">
+                <span class="log-time">[${l.timestamp}]</span> <strong>${l.id}</strong><br>
+                Item: <strong>${l.productName}</strong> (₹${l.productPrice})<br>
+                <span class="log-unavailable">⚠️ AI SERVICE TEMPORARILY UNAVAILABLE</span><br>
+                Status Reason: "${l.reason}"<br>
+                Guardrail: <span class="log-needs">MANUAL REVIEW REQUIRED</span><br>
+                Outcome: <span style="color:#94a3b8;">SKIPPED (AI UNAVAILABLE)</span>
+              </div>
+            `;
+          }
+
+          const statusClass = l.approvalStatus === 'auto_approved' ? 'log-auto' : 'log-needs';
+          let outcomeMarkup = `<span style="color:#94a3b8;">PENDING</span>`;
+          if (l.outcome === 'accepted') outcomeMarkup = `<span class="log-accept">ACCEPTED</span>`;
+          if (l.outcome === 'rejected') outcomeMarkup = `<span class="log-reject">REJECTED</span>`;
+
+          const aiSuggestBool = l.aiSuggest !== undefined ? l.aiSuggest : l.claudeSuggest;
+
+          return `
+            <div class="log-item">
+              <span class="log-time">[${l.timestamp}]</span> <strong>${l.id}</strong><br>
+              Item: <strong>${l.productName}</strong> (₹${l.productPrice})<br>
+              AI Fit: ${aiSuggestBool ? 'YES' : 'NO'} ("${l.reason}")<br>
+              Guardrail: <span class="${statusClass}">${l.approvalStatus.toUpperCase()}</span> (${l.priceRatioPercentage})<br>
+              Outcome: ${outcomeMarkup}
+            </div>
+          `;
+        }).reverse().join('');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function resetSession() {
+      try {
+        const res = await fetch('/api/reset', { method: 'POST' });
+        const data = await res.json();
+
+        currentLogId = null;
+        currentEvaluatedProduct = null;
+
+        // Reset AI Upsell Agent card to initial state
+        const evalBox = document.getElementById('eval-box');
+        evalBox.style.display = 'none';
+        evalBox.style.opacity = '1';
+        document.getElementById('eval-badge').className = 'badge';
+        document.getElementById('eval-badge').innerText = 'EVALUATING...';
+        document.getElementById('eval-product-name').innerText = '-';
+        document.getElementById('eval-reason').innerText = '-';
+        document.getElementById('eval-buttons').style.display = 'none';
+
+        // Reset Razorpay result card
+        const rzpBox = document.getElementById('razorpay-result');
+        rzpBox.style.display = 'none';
+        rzpBox.style.opacity = '1';
+        rzpBox.innerHTML = `
+          <h4 style="margin-bottom: 0.5rem; color: #6ee7b7;">🎉 Razorpay Test Order Created!</h4>
+          <p style="font-size: 0.9rem;">Order ID: <strong id="rzp-order-id">-</strong></p>
+          <p style="font-size: 0.9rem;">Amount: <strong id="rzp-amount">-</strong></p>
+          <p style="font-size: 0.9rem;">Receipt: <strong id="rzp-receipt">-</strong></p>
+        `;
+
+        renderCart(data);
+        fetchLogs();
+      } catch (err) {
+        console.error('Failed to reset session:', err);
+      }
+    }
+
+    // Initialize on page load
+    loadCart();
+    fetchLogs();
+  </script>
+</body>
+
+</html>
