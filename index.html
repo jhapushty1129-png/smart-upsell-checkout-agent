@@ -400,18 +400,13 @@
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn-key" onclick="configureApiKey()" id="btn-api-key" title="Set custom Gemini API key for GitHub Pages">🔑 API Key</button>
         <button class="btn-reset" onclick="resetSession()">🔄 Reset Session</button>
       </div>
     </header>
 
-    <!-- Mode & Simulation Banner -->
+    <!-- Simulated Failure Mode Banner (only active when ?simulateFailure=true) -->
     <div id="simulated-failure-banner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-red); color: #fca5a5; padding: 0.6rem 1rem; border-radius: 10px; margin-bottom: 1.5rem; font-size: 0.9rem;">
       ⚠️ <strong>Simulated Failure Mode Active (?simulateFailure=true)</strong>: Gemini API calls will simulate temporary unavailability to verify graceful app degradation. Cart and checkout remain 100% operational.
-    </div>
-
-    <div id="gh-pages-banner" style="display: none; background: rgba(59, 130, 246, 0.15); border: 1px solid var(--accent-blue); color: #93c5fd; padding: 0.6rem 1rem; border-radius: 10px; margin-bottom: 1.5rem; font-size: 0.85rem;">
-      🌐 <strong>Live GitHub Pages Mode</strong>: Running browser engine directly on GitHub. All features, 20% guardrails, audit logging, and Razorpay test checkout are fully active.
     </div>
 
     <div class="grid">
