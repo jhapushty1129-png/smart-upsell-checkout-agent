@@ -567,8 +567,10 @@
     function getApiBaseUrl() {
       const customUrl = localStorage.getItem('CUSTOM_BACKEND_URL');
       if (customUrl && customUrl.trim()) return customUrl.trim().replace(/\/+$/, '');
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return '';
-      return null; // Return null to use client engine by default when on static hosting
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return window.location.origin; // e.g. "http://localhost:3000"
+      }
+      return null; // Return null to use embedded client engine on GitHub Pages static host
     }
 
     function setCustomBackendUrl() {
@@ -596,7 +598,7 @@
 
     async function loadCart() {
       const apiBase = getApiBaseUrl();
-      if (apiBase) {
+      if (apiBase !== null) {
         try {
           const controller = new AbortController();
           const tid = setTimeout(() => controller.abort(), 2000);
@@ -605,10 +607,11 @@
           if (res.ok) {
             const data = await res.json();
             renderCartServer(data);
+            fetchLogsServer(apiBase);
             return;
           }
         } catch (e) {
-          console.warn('Backend API fetch failed, switching to client engine:', e);
+          console.warn('Backend API fetch failed, switching to client engine:', e.message);
         }
       }
       renderCartLocal();
@@ -665,12 +668,17 @@
       btn.innerText = 'Evaluating...';
       btn.disabled = true;
 
+      const resetBtn = () => {
+        btn.innerText = originalText;
+        btn.disabled = false;
+      };
+
       const apiBase = getApiBaseUrl();
 
-      if (apiBase) {
+      if (apiBase !== null) {
         try {
           const controller = new AbortController();
-          const tid = setTimeout(() => controller.abort(), 3000);
+          const tid = setTimeout(() => controller.abort(), 8000);
           const res = await fetch(`${apiBase}/api/upsell/evaluate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -685,23 +693,18 @@
             evalBox.style.opacity = '1';
             displayEvalResult(data.product, data.aiResult || {}, data.guardrailResult || {});
             fetchLogsServer(apiBase);
+            resetBtn();
             return;
           }
         } catch (err) {
-          console.warn('Backend API evaluate failed, using local engine:', err);
-        } finally {
-          btn.innerText = originalText;
-          btn.disabled = false;
+          console.warn('Backend API evaluate failed, using local engine:', err.message);
         }
       }
 
-      // Local Client Engine execution
-      setTimeout(() => {
-        evalBox.style.opacity = '1';
-        btn.innerText = originalText;
-        btn.disabled = false;
-        evaluateUpsellLocal(type);
-      }, 400);
+      // Local Client Engine execution fallback
+      evalBox.style.opacity = '1';
+      evaluateUpsellLocal(type);
+      resetBtn();
     }
 
     function evaluateUpsellLocal(type) {
@@ -791,7 +794,7 @@
       if (!currentLogId) return;
 
       const apiBase = getApiBaseUrl();
-      if (apiBase) {
+      if (apiBase !== null) {
         try {
           const res = await fetch(`${apiBase}/api/upsell/respond`, {
             method: 'POST',
@@ -807,7 +810,7 @@
             return;
           }
         } catch (err) {
-          console.warn('Backend API respond failed, applying locally:', err);
+          console.warn('Backend API respond failed, applying locally:', err.message);
         }
       }
 
@@ -832,13 +835,17 @@
 
       const apiBase = getApiBaseUrl();
 
-      if (apiBase) {
+      if (apiBase !== null) {
         try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 8000);
           const res = await fetch(`${apiBase}/api/checkout`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ simulateCheckoutFailure: isSimulatedCheckoutFailureActive })
+            body: JSON.stringify({ simulateCheckoutFailure: isSimulatedCheckoutFailureActive }),
+            signal: controller.signal
           });
+          clearTimeout(tid);
           const data = await res.json();
           resBox.style.opacity = '1';
           if (data.success) {
@@ -850,11 +857,11 @@
             return;
           }
         } catch (err) {
-          console.warn('Backend API checkout failed, using local engine:', err);
+          console.warn('Backend API checkout failed, using local engine:', err.message);
         }
       }
 
-      // Local Razorpay simulation
+      // Local Razorpay simulation fallback
       resBox.style.opacity = '1';
       if (isSimulatedCheckoutFailureActive) {
         renderCheckoutFailure('Razorpay payment gateway temporarily unavailable (Simulated demo failure).');
@@ -935,7 +942,7 @@
           renderLogsArray(data.rawLogs || []);
         }
       } catch (err) {
-        console.warn('Failed to fetch logs from server:', err);
+        console.warn('Failed to fetch logs from server:', err.message);
       }
     }
 
@@ -979,7 +986,7 @@
 
     async function resetSession() {
       const apiBase = getApiBaseUrl();
-      if (apiBase) {
+      if (apiBase !== null) {
         try {
           const res = await fetch(`${apiBase}/api/reset`, { method: 'POST' });
           if (res.ok) {
@@ -992,7 +999,7 @@
             return;
           }
         } catch (err) {
-          console.warn('Backend reset failed, resetting locally:', err);
+          console.warn('Backend reset failed, resetting locally:', err.message);
         }
       }
 
