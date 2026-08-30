@@ -166,15 +166,16 @@ app.post('/api/upsell/respond', (req, res) => {
  */
 app.post('/api/checkout', async (req, res) => {
   try {
+    const simulateCheckoutFailure = req.query.simulateCheckoutFailure === 'true' || req.body?.simulateCheckoutFailure === true || req.body?.simulateCheckoutFailure === 'true';
     const cartState = getCartState();
     const totalAmountInINR = cartState.subtotal;
 
-    console.log(`[Server] Initiating checkout for cart total ₹${totalAmountInINR}...`);
+    console.log(`[Server] Initiating checkout for cart total ₹${totalAmountInINR} ${simulateCheckoutFailure ? '[SIMULATED FAILURE MODE]' : ''}...`);
 
     const result = await createRazorpayOrder(totalAmountInINR, 'checkout_order', {
       itemCount: cartState.items.length,
       itemNames: cartState.items.map((i) => i.name).join(', '),
-    });
+    }, { simulateFailure: simulateCheckoutFailure });
 
     if (result.success) {
       res.json({

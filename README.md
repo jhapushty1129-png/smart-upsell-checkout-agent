@@ -120,20 +120,24 @@ Follow these 5 steps to verify all hackathon criteria in under 2 minutes:
 * Click **"Evaluate Candidate (Wrist Rest ₹450)"** again.
 * **Result:** Status changes to `⚠️ NEEDS APPROVAL` because projected session total (`₹900`) would exceed the `₹700` session cap limit.
 
-### 4️⃣ Graceful AI Failure Recovery Demo Mode
-* Open **`http://localhost:3000/?simulateFailure=true`** in your browser.
-* Notice the red alert banner indicating simulated failure mode is active.
-* Click **"Evaluate Candidate"**.
-* **Result:** Displays red badge `⚠️ AI SERVICE TEMPORARILY UNAVAILABLE`. The server does not crash, base shopping cart remains functional, and Razorpay checkout works seamlessly.
+### 4️⃣ Graceful Failure Recovery Demo Modes
+* **4a. Gemini AI Service Failure Mode (`?simulateFailure=true`):**
+  * Open **`http://localhost:3000/?simulateFailure=true`** (or live backend link).
+  * Click **"Evaluate Candidate"**.
+  * **Result:** Displays red badge `⚠️ AI SERVICE TEMPORARILY UNAVAILABLE`. The server does not crash, base shopping cart remains functional, and Razorpay checkout works seamlessly.
+* **4b. Razorpay Checkout Failure Mode (`?simulateCheckoutFailure=true`):**
+  * Open **`http://localhost:3000/?simulateCheckoutFailure=true`** (or live backend link).
+  * Click **"💳 Pay & Checkout with Razorpay"**.
+  * **Result:** Displays red card `⚠️ Razorpay Payment Gateway Error`. App does not crash, and AI recommendations remain 100% operational.
 
 ### 5️⃣ Real Razorpay Test Checkout Execution
-* Click **"💳 Pay & Checkout with Razorpay"**.
-* **Result:** Executes a real `razorpay.orders.create` API call and displays the live Razorpay Order ID (e.g. `order_TVUJ...`), total amount in INR, and receipt reference.
+* Click **"💳 Pay & Checkout with Razorpay"** (without failure flags).
+* **Result:** Executes a real `razorpay.orders.create` API call and displays the live Razorpay Order ID (e.g. `order_TVrM...`), total amount in INR, and receipt reference.
 
-### ⚡ CLI Direct Razorpay Test Script
-You can also test Razorpay order creation directly from terminal:
+### ⚡ CLI Direct Verification Script
+Run the automated end-to-end verification script:
 ```bash
-node test-order.js
+node test_empirical_verification.js
 ```
 
 ---

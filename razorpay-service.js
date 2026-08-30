@@ -25,14 +25,24 @@ function getRazorpayInstance() {
  * @param {object} notes - Optional metadata notes
  * @returns {Promise<object>} The created Razorpay order object
  */
-async function createRazorpayOrder(amountInINR, receiptPrefix = 'receipt_order', notes = {}) {
+async function createRazorpayOrder(amountInINR, receiptPrefix = 'receipt_order', notes = {}, options = {}) {
+  const { simulateFailure = false } = options;
+
+  if (simulateFailure) {
+    console.warn('⚠️ [RazorpayService] Simulated checkout failure mode triggered via request parameter.');
+    return {
+      success: false,
+      error: 'Razorpay payment gateway temporarily unavailable (Simulated demo failure).',
+    };
+  }
+
   try {
     const razorpay = getRazorpayInstance();
 
     // Razorpay accepts amounts in paise (1 INR = 100 paise)
     const amountInPaise = Math.round(amountInINR * 100);
 
-    const options = {
+    const optionsObj = {
       amount: amountInPaise,
       currency: 'INR',
       receipt: `${receiptPrefix}_${Date.now()}`,
@@ -42,7 +52,7 @@ async function createRazorpayOrder(amountInINR, receiptPrefix = 'receipt_order',
       },
     };
 
-    const order = await razorpay.orders.create(options);
+    const order = await razorpay.orders.create(optionsObj);
     return { success: true, order };
   } catch (error) {
     console.error('--- Failed to Create Razorpay Order ---');

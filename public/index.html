@@ -400,13 +400,19 @@
         </div>
       </div>
       <div class="header-actions">
+        <button class="btn-key" onclick="setCustomBackendUrl()">⚙️ Backend API</button>
         <button class="btn-reset" onclick="resetSession()">🔄 Reset Session</button>
       </div>
     </header>
 
-    <!-- Simulated Failure Mode Banner (only active when ?simulateFailure=true) -->
+    <!-- Simulated AI Failure Mode Banner (only active when ?simulateFailure=true) -->
     <div id="simulated-failure-banner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-red); color: #fca5a5; padding: 0.6rem 1rem; border-radius: 10px; margin-bottom: 1.5rem; font-size: 0.9rem;">
-      ⚠️ <strong>Simulated Failure Mode Active (?simulateFailure=true)</strong>: Gemini API calls will simulate temporary unavailability to verify graceful app degradation. Cart and checkout remain 100% operational.
+      ⚠️ <strong>Simulated AI Failure Mode Active (?simulateFailure=true)</strong>: Gemini API calls will simulate temporary unavailability to verify graceful app degradation. Cart and checkout remain 100% operational.
+    </div>
+
+    <!-- Simulated Razorpay Checkout Failure Mode Banner (only active when ?simulateCheckoutFailure=true) -->
+    <div id="simulated-checkout-failure-banner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-red); color: #fca5a5; padding: 0.6rem 1rem; border-radius: 10px; margin-bottom: 1.5rem; font-size: 0.9rem;">
+      ⚠️ <strong>Simulated Razorpay Checkout Failure Mode Active (?simulateCheckoutFailure=true)</strong>: Razorpay order creation will simulate payment gateway unavailability. AI evaluation remains 100% operational.
     </div>
 
     <div class="grid">
@@ -503,73 +509,79 @@
   <script>
     let currentLogId = null;
     let currentEvaluatedProduct = null;
-    let isClientMode = false;
 
-    // Standard Candidate Products
-    const PRODUCTS = {
-      standard: {
-        id: 'upsell_1',
-        name: 'Memory Foam Wrist Rest Pad',
-        price: 450,
-        category: 'Accessories',
-        description: 'Ergonomic wrist rest designed to complement mechanical keyboards and optical mice for maximum comfort.'
-      },
-      high_value: {
-        id: 'upsell_2',
-        name: 'Premium Dual Monitor Stand',
-        price: 1200,
-        category: 'Desk Setup',
-        description: 'Heavy-duty steel dual monitor arm mount with height adjustment and cable management.'
+    // Helper: Determine Backend Base URL
+    // Priority: 1. Custom URL in localStorage ('CUSTOM_BACKEND_URL')
+    //           2. Relative path ('') if running on localhost / 127.0.0.1
+    //           3. Production deployed backend URL
+    function getApiBaseUrl() {
+      const customUrl = localStorage.getItem('CUSTOM_BACKEND_URL');
+      if (customUrl && customUrl.trim()) {
+        return customUrl.trim().replace(/\/+$/, '');
       }
-    };
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return '';
+      }
+      return 'https://smart-upsell-checkout-agent.onrender.com';
+    }
 
-    // Client-side fallback state for GitHub Pages
-    let clientState = {
-      items: [
-        { id: 'item_1', name: 'Mechanical Gaming Keyboard', price: 2500, category: 'Electronics' },
-        { id: 'item_2', name: 'Ergonomic Wireless Mouse', price: 1000, category: 'Electronics' }
-      ],
-      originalCartValue: 3500,
-      cumulativeApproved: 0,
-      logs: [],
-      logCounter: 1
-    };
+    function setCustomBackendUrl() {
+      const current = getApiBaseUrl();
+      const input = prompt('Enter your deployed live backend API URL:\n(e.g., https://smart-upsell-checkout-agent.onrender.com)', current);
+      if (input !== null) {
+        if (input.trim()) {
+          localStorage.setItem('CUSTOM_BACKEND_URL', input.trim());
+          alert('✅ Backend URL updated to: ' + input.trim());
+        } else {
+          localStorage.removeItem('CUSTOM_BACKEND_URL');
+          alert('Reset backend URL to default.');
+        }
+        loadCart();
+        fetchLogs();
+      }
+    }
 
-    // Check for ?simulateFailure=true in URL
+    // Check for failure simulation parameters in URL
     const urlParams = new URLSearchParams(window.location.search);
     const isSimulatedFailureActive = urlParams.get('simulateFailure') === 'true';
+    const isSimulatedCheckoutFailureActive = urlParams.get('simulateCheckoutFailure') === 'true';
 
     if (isSimulatedFailureActive) {
       document.getElementById('simulated-failure-banner').style.display = 'block';
     }
-
-    function configureApiKey() {
-      const existing = localStorage.getItem('GEMINI_API_KEY') || '';
-      const key = prompt('Enter your Google Gemini API Key for client-side evaluation on GitHub Pages:\n(Leave blank to use smart client simulation)', existing);
-      if (key !== null) {
-        if (key.trim()) {
-          localStorage.setItem('GEMINI_API_KEY', key.trim());
-          alert('✅ Gemini API Key saved for browser evaluations!');
-        } else {
-          localStorage.removeItem('GEMINI_API_KEY');
-          alert('Cleared custom Gemini API Key. Using client simulation.');
-        }
-      }
+    if (isSimulatedCheckoutFailureActive) {
+      document.getElementById('simulated-checkout-failure-banner').style.display = 'block';
     }
 
     async function loadCart() {
+      const apiBase = getApiBaseUrl();
       try {
-        const res = await fetch('/api/cart');
-        if (!res.ok) throw new Error('Not running on backend server');
+        const res = await fetch(`${apiBase}/api/cart`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         const data = await res.json();
-        isClientMode = false;
+        hideConnectionError();
         renderCart(data);
       } catch (err) {
-        // Switch seamlessly to GitHub Pages / Client Mode
-        isClientMode = true;
-        document.getElementById('gh-pages-banner').style.display = 'block';
-        renderClientCart();
+        console.error('Failed to load cart from backend:', err);
+        showConnectionError(apiBase);
       }
+    }
+
+    function showConnectionError(apiBase) {
+      let errBanner = document.getElementById('backend-conn-banner');
+      if (!errBanner) {
+        errBanner = document.createElement('div');
+        errBanner.id = 'backend-conn-banner';
+        errBanner.style.cssText = 'background: rgba(245, 158, 11, 0.2); border: 1px solid var(--accent-amber); color: #fde047; padding: 0.75rem 1rem; border-radius: 10px; margin-bottom: 1.5rem; font-size: 0.9rem;';
+        document.querySelector('.container').insertBefore(errBanner, document.querySelector('.grid'));
+      }
+      errBanner.innerHTML = `⚠️ <strong>Connecting to Live Backend API (${apiBase || 'Local'})</strong>: If hosted on a free tier (e.g. Render), server may take ~30s to wake up. <button onclick="loadCart()" style="background:#334155;color:#fff;border:none;padding:0.25rem 0.5rem;border-radius:4px;cursor:pointer;margin-left:0.5rem;">Retry Connection</button> <button onclick="setCustomBackendUrl()" style="background:#475569;color:#fff;border:none;padding:0.25rem 0.5rem;border-radius:4px;cursor:pointer;margin-left:0.25rem;">Change URL</button>`;
+      errBanner.style.display = 'block';
+    }
+
+    function hideConnectionError() {
+      const errBanner = document.getElementById('backend-conn-banner');
+      if (errBanner) errBanner.style.display = 'none';
     }
 
     function renderCart(data) {
@@ -577,15 +589,9 @@
       const cartObj = data.cart || data;
       const items = cartObj.items || [];
       const subtotal = cartObj.subtotal !== undefined ? cartObj.subtotal : 0;
-      const cap = data.sessionCap || cartObj.sessionCap;
+      const cap = data.sessionCap || cartObj.sessionCap || { cumulativeAutoApprovedAmount: 0, maxSessionCap: 700 };
 
       updateCartDOM(items, subtotal, cap.cumulativeAutoApprovedAmount, cap.maxSessionCap);
-    }
-
-    function renderClientCart() {
-      const subtotal = clientState.items.reduce((sum, item) => sum + item.price, 0);
-      const maxCap = clientState.originalCartValue * 0.20;
-      updateCartDOM(clientState.items, subtotal, clientState.cumulativeApproved, maxCap);
     }
 
     function updateCartDOM(items, subtotal, cumulativeApproved, maxCap) {
@@ -605,9 +611,9 @@
       document.getElementById('item-count-badge').innerText = `${items.length} Items`;
       document.getElementById('cart-total').innerText = `₹${subtotal.toLocaleString()}`;
 
-      const pct = Math.min(100, (cumulativeApproved / maxCap) * 100);
+      const pct = Math.min(100, (cumulativeApproved / (maxCap || 1)) * 100);
       document.getElementById('cap-progress').style.width = `${pct}%`;
-      document.getElementById('cap-text').innerText = `₹${cumulativeApproved} / ₹${maxCap.toFixed(0)}`;
+      document.getElementById('cap-text').innerText = `₹${cumulativeApproved} / ₹${(maxCap || 0).toFixed(0)}`;
     }
 
     async function evaluateUpsell(type) {
@@ -618,7 +624,7 @@
       document.getElementById('eval-badge').className = 'badge';
       document.getElementById('eval-badge').innerText = 'EVALUATING...';
       document.getElementById('eval-product-name').innerText = 'Evaluating AI recommendation...';
-      document.getElementById('eval-reason').innerText = 'Querying AI model...';
+      document.getElementById('eval-reason').innerText = 'Querying Gemini AI model...';
       document.getElementById('eval-buttons').style.display = 'none';
 
       const btn = type === 'standard' ? document.getElementById('btn-eval-std') : document.getElementById('btn-eval-high');
@@ -626,123 +632,33 @@
       btn.innerText = 'Evaluating...';
       btn.disabled = true;
 
+      const apiBase = getApiBaseUrl();
+
       try {
-        if (!isClientMode) {
-          // Express Backend Mode
-          const res = await fetch('/api/upsell/evaluate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              upsellType: type,
-              simulateFailure: isSimulatedFailureActive
-            })
-          });
-          const data = await res.json();
-          currentLogId = data.logId;
-          currentEvaluatedProduct = data.product;
-          evalBox.style.opacity = '1';
-          displayEvalResult(data.product, data.aiResult || {}, data.guardrailResult || {});
-          fetchLogs();
-        } else {
-          // GitHub Pages Client Engine Mode
-          await new Promise(r => setTimeout(r, 600)); // Smooth loading simulation
-          const targetProduct = PRODUCTS[type] || PRODUCTS.standard;
-          currentEvaluatedProduct = targetProduct;
-
-          let aiResult;
-          if (isSimulatedFailureActive) {
-            aiResult = { suggest: false, unavailable: true, reason: 'AI service temporarily unavailable (Simulated demo failure).' };
-          } else {
-            const userKey = localStorage.getItem('GEMINI_API_KEY');
-            if (userKey) {
-              aiResult = await evaluateGeminiClientDirect(clientState.items, targetProduct, userKey);
-            } else {
-              aiResult = type === 'standard' 
-                ? { suggest: true, reason: 'Ergonomic wrist rest pad complements the keyboard and mouse in cart.' }
-                : { suggest: false, reason: 'Item cost is high relative to cart baseline.' };
-            }
-          }
-
-          const currentSubtotal = clientState.items.reduce((sum, i) => sum + i.price, 0);
-          const maxCap = clientState.originalCartValue * 0.20;
-          const priceRatio = targetProduct.price / currentSubtotal;
-          const isUnder20 = priceRatio < 0.20;
-          const capFits = (clientState.cumulativeApproved + targetProduct.price) <= maxCap;
-
-          let approvalStatus = 'needs_approval';
-          let overrideReason = null;
-
-          if (aiResult.unavailable) {
-            overrideReason = 'AI service temporarily unavailable (Manual review required).';
-          } else if (!aiResult.suggest) {
-            overrideReason = 'AI model did not recommend this upsell item.';
-          } else if (isUnder20 && capFits) {
-            approvalStatus = 'auto_approved';
-          } else if (isUnder20 && !capFits) {
-            overrideReason = `Session cumulative auto-approval cap would be exceeded (Limit: ₹${maxCap}, Projected: ₹${clientState.cumulativeApproved + targetProduct.price}).`;
-          } else {
-            overrideReason = `${(priceRatio * 100).toFixed(1)}% of cart total (>=20% threshold)`;
-          }
-
-          const guardrailResult = {
-            approvalStatus,
-            priceRatioPercentage: (priceRatio * 100).toFixed(1) + '%',
-            overrideReason
-          };
-
-          // Record client-side log
-          const timestamp = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-          const id = `LOG-${Date.now()}-${clientState.logCounter++}`;
-          currentLogId = id;
-
-          clientState.logs.push({
-            id,
-            timestamp,
-            productName: targetProduct.name,
-            productPrice: targetProduct.price,
-            aiSuggest: aiResult.suggest,
-            isServiceUnavailable: aiResult.unavailable === true,
-            reason: aiResult.reason,
-            approvalStatus,
-            priceRatioPercentage: (priceRatio * 100).toFixed(1) + '%',
-            outcome: 'pending'
-          });
-
-          evalBox.style.opacity = '1';
-          displayEvalResult(targetProduct, aiResult, guardrailResult);
-          renderClientLogs();
-        }
+        const res = await fetch(`${apiBase}/api/upsell/evaluate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            upsellType: type,
+            simulateFailure: isSimulatedFailureActive
+          })
+        });
+        const data = await res.json();
+        currentLogId = data.logId;
+        currentEvaluatedProduct = data.product;
+        evalBox.style.opacity = '1';
+        displayEvalResult(data.product, data.aiResult || {}, data.guardrailResult || {});
+        fetchLogs();
       } catch (err) {
-        console.error(err);
+        console.error('Error evaluating upsell:', err);
+        evalBox.style.opacity = '1';
+        document.getElementById('eval-badge').className = 'badge badge-danger';
+        document.getElementById('eval-badge').innerText = '❌ BACKEND CONNECTION ERROR';
+        document.getElementById('eval-product-name').innerText = 'Failed to connect to backend server';
+        document.getElementById('eval-reason').innerText = `Could not reach ${apiBase}/api/upsell/evaluate. Please check your backend service.`;
       } finally {
         btn.innerText = originalText;
         btn.disabled = false;
-      }
-    }
-
-    async function evaluateGeminiClientDirect(cartItems, candidate, apiKey) {
-      try {
-        const cartSummary = cartItems.map((item) => `- ${item.name} (Price: ₹${item.price})`).join('\n');
-        const cartTotal = cartItems.reduce((sum, item) => sum + item.price, 0);
-        const promptText = `Cart Items:\n${cartSummary}\nTotal Cart Value: ₹${cartTotal}\n\nCandidate Upsell Product:\nName: ${candidate.name}\nPrice: ₹${candidate.price}\nDescription: ${candidate.description || 'N/A'}\n\nIs this candidate upsell product a good fit for the customer's cart?`;
-
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: promptText }] }],
-            generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
-          })
-        });
-
-        if (!res.ok) throw new Error('API request failed');
-        const data = await res.json();
-        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        const parsed = JSON.parse(rawText.replace(/^```json\s*/, '').replace(/\s*```$/, ''));
-        return { suggest: !!parsed.suggest, reason: parsed.reason || 'AI evaluation complete.' };
-      } catch (err) {
-        console.warn('Client Gemini call error:', err);
-        return { suggest: false, unavailable: true, reason: 'AI service temporarily unavailable (Gemini API timeout or error).' };
       }
     }
 
@@ -753,7 +669,7 @@
         badge.className = 'badge badge-danger';
         badge.innerText = '⚠️ AI SERVICE TEMPORARILY UNAVAILABLE';
         document.getElementById('eval-product-name').innerText = `${product.name} (₹${product.price})`;
-        document.getElementById('eval-reason').innerText = 'AI service temporarily unavailable. You can still proceed with cart & checkout normally.';
+        document.getElementById('eval-reason').innerText = aiResult.reason || 'AI service temporarily unavailable. You can still proceed with cart & checkout normally.';
         document.getElementById('eval-buttons').style.display = 'none';
       } else {
         if (guardrail.approvalStatus === 'auto_approved') {
@@ -773,42 +689,25 @@
 
     async function respondUpsell(action) {
       if (!currentLogId) return;
+      const apiBase = getApiBaseUrl();
 
-      if (!isClientMode) {
-        try {
-          const res = await fetch('/api/upsell/respond', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              logId: currentLogId,
-              action,
-              product: currentEvaluatedProduct
-            })
-          });
-          const data = await res.json();
-          renderCart(data);
-          document.getElementById('eval-buttons').style.display = 'none';
-          document.getElementById('eval-reason').innerText += ` | Outcome: ${action.toUpperCase()}`;
-          fetchLogs();
-        } catch (err) {
-          console.error(err);
-        }
-      } else {
-        // GitHub Pages Client Mode
-        const entry = clientState.logs.find(l => l.id === currentLogId);
-        if (entry) {
-          entry.outcome = action === 'accept' ? 'accepted' : 'rejected';
-        }
-
-        if (action === 'accept' && currentEvaluatedProduct) {
-          clientState.items.push(currentEvaluatedProduct);
-          clientState.cumulativeApproved += currentEvaluatedProduct.price;
-        }
-
-        renderClientCart();
+      try {
+        const res = await fetch(`${apiBase}/api/upsell/respond`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            logId: currentLogId,
+            action,
+            product: currentEvaluatedProduct
+          })
+        });
+        const data = await res.json();
+        renderCart(data);
         document.getElementById('eval-buttons').style.display = 'none';
         document.getElementById('eval-reason').innerText += ` | Outcome: ${action.toUpperCase()}`;
-        renderClientLogs();
+        fetchLogs();
+      } catch (err) {
+        console.error('Error responding to upsell:', err);
       }
     }
 
@@ -816,51 +715,59 @@
       const resBox = document.getElementById('razorpay-result');
       resBox.style.display = 'block';
       resBox.style.opacity = '0.6';
+      const apiBase = getApiBaseUrl();
 
-      if (!isClientMode) {
-        try {
-          const res = await fetch('/api/checkout', { method: 'POST' });
-          const data = await res.json();
-          resBox.style.opacity = '1';
-          if (data.success) {
-            document.getElementById('rzp-order-id').innerText = data.order.id;
-            document.getElementById('rzp-amount').innerText = `₹${data.order.amount / 100} ${data.order.currency}`;
-            document.getElementById('rzp-receipt').innerText = data.order.receipt;
-          } else {
-            resBox.innerHTML = `<h4 style="color:#f87171;">Checkout Failed</h4><p>${data.error}</p>`;
-          }
-        } catch (err) {
-          console.error(err);
+      try {
+        const res = await fetch(`${apiBase}/api/checkout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            simulateCheckoutFailure: isSimulatedCheckoutFailureActive
+          })
+        });
+        const data = await res.json();
+        resBox.style.opacity = '1';
+        if (data.success) {
+          resBox.className = 'razorpay-result';
+          resBox.style.background = '#064e3b';
+          resBox.style.border = '1px solid #10b981';
+          resBox.innerHTML = `
+            <h4 style="margin-bottom: 0.5rem; color: #6ee7b7;">🎉 Razorpay Test Order Created!</h4>
+            <p style="font-size: 0.9rem;">Order ID: <strong id="rzp-order-id">${data.order.id}</strong></p>
+            <p style="font-size: 0.9rem;">Amount: <strong id="rzp-amount">₹${data.order.amount / 100} ${data.order.currency}</strong></p>
+            <p style="font-size: 0.9rem;">Receipt: <strong id="rzp-receipt">${data.order.receipt}</strong></p>
+          `;
+        } else {
+          resBox.className = 'razorpay-result';
+          resBox.style.background = 'rgba(239, 68, 68, 0.15)';
+          resBox.style.border = '1px solid #ef4444';
+          resBox.innerHTML = `
+            <h4 style="margin-bottom: 0.5rem; color: #fca5a5;">⚠️ Razorpay Payment Gateway Error</h4>
+            <p style="font-size: 0.9rem; color: #cbd5e1;">${data.error || 'Payment gateway order creation failed.'}</p>
+            <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.4rem;">Note: AI recommendations and shopping cart state remain 100% operational.</p>
+          `;
         }
-      } else {
-        // GitHub Pages Test Order Simulation
-        setTimeout(() => {
-          const subtotal = clientState.items.reduce((sum, item) => sum + item.price, 0);
-          resBox.style.opacity = '1';
-          document.getElementById('rzp-order-id').innerText = `order_ghpages_${Math.random().toString(36).substring(2, 10)}`;
-          document.getElementById('rzp-amount').innerText = `₹${subtotal} INR`;
-          document.getElementById('rzp-receipt').innerText = `receipt_ghpages_${Date.now()}`;
-        }, 400);
+      } catch (err) {
+        console.error('Checkout error:', err);
+        resBox.style.opacity = '1';
+        resBox.style.background = 'rgba(239, 68, 68, 0.15)';
+        resBox.style.border = '1px solid #ef4444';
+        resBox.innerHTML = `
+          <h4 style="margin-bottom: 0.5rem; color: #fca5a5;">⚠️ Checkout Connection Failed</h4>
+          <p style="font-size: 0.9rem; color: #cbd5e1;">Could not reach backend API at ${apiBase}. Ensure backend server is running.</p>
+        `;
       }
     }
 
     async function fetchLogs() {
-      if (isClientMode) {
-        renderClientLogs();
-        return;
-      }
-
+      const apiBase = getApiBaseUrl();
       try {
-        const res = await fetch('/api/logs');
+        const res = await fetch(`${apiBase}/api/logs`);
         const data = await res.json();
         renderLogsArray(data.rawLogs || []);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to fetch logs:', err);
       }
-    }
-
-    function renderClientLogs() {
-      renderLogsArray(clientState.logs);
     }
 
     function renderLogsArray(logs) {
@@ -902,32 +809,18 @@
     }
 
     async function resetSession() {
-      if (!isClientMode) {
-        try {
-          const res = await fetch('/api/reset', { method: 'POST' });
-          const data = await res.json();
+      const apiBase = getApiBaseUrl();
+      try {
+        const res = await fetch(`${apiBase}/api/reset`, { method: 'POST' });
+        const data = await res.json();
 
-          currentLogId = null;
-          currentEvaluatedProduct = null;
-          resetUIBoxes();
-          renderCart(data);
-          fetchLogs();
-        } catch (err) {
-          console.error('Failed to reset session:', err);
-        }
-      } else {
-        clientState.items = [
-          { id: 'item_1', name: 'Mechanical Gaming Keyboard', price: 2500, category: 'Electronics' },
-          { id: 'item_2', name: 'Ergonomic Wireless Mouse', price: 1000, category: 'Electronics' }
-        ];
-        clientState.cumulativeApproved = 0;
-        clientState.logs = [];
         currentLogId = null;
         currentEvaluatedProduct = null;
-
         resetUIBoxes();
-        renderClientCart();
-        renderClientLogs();
+        renderCart(data);
+        fetchLogs();
+      } catch (err) {
+        console.error('Failed to reset session:', err);
       }
     }
 
@@ -944,6 +837,8 @@
       const rzpBox = document.getElementById('razorpay-result');
       rzpBox.style.display = 'none';
       rzpBox.style.opacity = '1';
+      rzpBox.style.background = '#064e3b';
+      rzpBox.style.border = '1px solid #10b981';
       rzpBox.innerHTML = `
         <h4 style="margin-bottom: 0.5rem; color: #6ee7b7;">🎉 Razorpay Test Order Created!</h4>
         <p style="font-size: 0.9rem;">Order ID: <strong id="rzp-order-id">-</strong></p>
