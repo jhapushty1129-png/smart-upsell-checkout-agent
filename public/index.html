@@ -32,12 +32,24 @@
       padding: 0;
     }
 
+    html {
+      overflow-y: auto !important;
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+      height: auto;
+      min-height: 100%;
+    }
+
     body {
       font-family: 'Outfit', sans-serif;
       background-color: var(--bg-dark);
       color: var(--text-main);
       min-height: 100vh;
-      padding: 2rem 1rem;
+      height: auto;
+      overflow-y: auto !important;
+      overflow-x: hidden;
+      padding: 2rem 1rem 4rem 1rem;
+      position: relative;
     }
 
     .container {
@@ -354,6 +366,7 @@
       padding: 1rem;
       max-height: 350px;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       color: #cbd5e1;
     }
 
@@ -513,6 +526,14 @@
   </div>
 
   <script>
+    // Ensure body & html remain scrollable at all times
+    setInterval(() => {
+      if (document.body.style.overflow === 'hidden' && !document.querySelector('.razorpay-checkout-frame')) {
+        document.body.style.overflow = 'auto';
+        document.documentElement.style.overflow = 'auto';
+      }
+    }, 500);
+
     // Automatically purge any stale legacy backend URLs from localStorage
     try {
       const storedUrl = localStorage.getItem('CUSTOM_BACKEND_URL');
@@ -568,7 +589,7 @@
       const customUrl = localStorage.getItem('CUSTOM_BACKEND_URL');
       if (customUrl && customUrl.trim()) return customUrl.trim().replace(/\/+$/, '');
       if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return window.location.origin; // e.g. "http://localhost:3000"
+        return window.location.origin; // Returns "http://localhost:3000"
       }
       return null; // Return null to use embedded client engine on GitHub Pages static host
     }
