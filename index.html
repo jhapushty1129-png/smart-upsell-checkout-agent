@@ -847,42 +847,6 @@
       renderLogsArray(localLogs);
     }
 
-    async function createRealRazorpayOrderClient(amountInINR) {
-      const auth = btoa('rzp_test_TTqCoyWslvMvnz:jBBTsEbPXe2xhpenoG9dp4LI');
-      const amountInPaise = Math.round(amountInINR * 100);
-      const receipt = `checkout_order_${Date.now()}`;
-      try {
-        const res = await fetch('https://api.razorpay.com/v1/orders', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Basic ' + auth
-          },
-          body: JSON.stringify({
-            amount: amountInPaise,
-            currency: 'INR',
-            receipt: receipt,
-            notes: { project: 'Smart Upsell Checkout Agent' }
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          return { success: true, order: data };
-        }
-      } catch (e) {
-        console.warn('Direct Razorpay API order creation fallback:', e);
-      }
-      return {
-        success: true,
-        order: {
-          id: `order_${Math.random().toString(36).substring(2, 14)}`,
-          amount: amountInPaise,
-          currency: 'INR',
-          receipt: receipt
-        }
-      };
-    }
-
     async function triggerCheckout() {
       const resBox = document.getElementById('razorpay-result');
       resBox.style.display = 'block';
@@ -922,9 +886,9 @@
         renderCheckoutFailure('Razorpay payment gateway temporarily unavailable (Simulated demo failure).');
       } else {
         const subtotal = calculateCartTotal();
-        const rzpResult = await createRealRazorpayOrderClient(subtotal);
-        const orderId = rzpResult.order.id;
-        const receipt = rzpResult.order.receipt;
+        const randStr = Math.random().toString(36).substring(2, 14);
+        const orderId = `order_${randStr}`;
+        const receipt = `checkout_order_${Date.now()}`;
         
         renderCheckoutSuccess(orderId, subtotal, receipt);
         openRazorpayModal(orderId, subtotal * 100);
@@ -963,12 +927,11 @@
       if (typeof Razorpay !== 'undefined') {
         try {
           const options = {
-            key: 'rzp_test_TTqCoyWslvMvnz',
+            key: 'rzp_test_TTqCoyWslvMvnz', // Public Test Key ID only (Safe for frontend)
             amount: amountInPaise || 350000,
             currency: 'INR',
             name: 'Smart Upsell Checkout Agent',
             description: 'Razorpay Buildathon Order Checkout',
-            order_id: orderId, // Genuine Razorpay order_id created via live API
             prefill: {
               name: 'Buildathon Judge',
               email: 'judge@razorpay.com',
@@ -982,6 +945,10 @@
               alert('🎉 Razorpay Test Payment Successful!\n\nPayment ID: ' + payId + '\nOrder ID: ' + (response.razorpay_order_id || orderId));
             }
           };
+
+          if (orderId && orderId.startsWith('order_') && !orderId.includes('local')) {
+            options.order_id = orderId;
+          }
 
           const rzp = new Razorpay(options);
           rzp.open();
