@@ -47,7 +47,7 @@ function parseAgentResponse(text) {
  * @returns {Promise<{suggest: boolean, reason: string, unavailable?: boolean}>}
  */
 async function evaluateUpsellWithGemini(cartItems, candidateUpsell, options = {}) {
-  const { simulateFailure = false, timeoutMs = 8000 } = options;
+  const { simulateFailure = false, timeoutMs = 15000 } = options;
 
   // 1. Trigger simulated failure on demand for demo/testing
   if (simulateFailure) {
@@ -71,7 +71,7 @@ async function evaluateUpsellWithGemini(cartItems, candidateUpsell, options = {}
 
   const candidateModels = [
     'gemini-3.6-flash',
-    'gemini-1.5-flash-latest'
+    'gemini-2.5-flash'
   ];
 
   const cartSummary = cartItems
