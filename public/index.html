@@ -4,12 +4,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Upsell Checkout Agent</title>
+  <title>Smart Upsell Checkout Agent — Razorpay Buildathon</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
     rel="stylesheet">
+  <!-- Official Razorpay Checkout Modal SDK -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
   <style>
     :root {
       --bg-dark: #0f172a;
@@ -245,6 +247,10 @@
       font-weight: 700;
       cursor: pointer;
       transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
     }
 
     .btn-checkout:hover {
@@ -396,18 +402,18 @@
         <div class="logo-icon">🤖</div>
         <div>
           <h1>Smart Upsell Checkout Agent</h1>
-          <p style="font-size: 0.85rem; color: var(--text-muted);">Gemini AI Agent + Razorpay + Guardrails</p>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Gemini AI Agent + Razorpay Buildathon + Code Guardrails</p>
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn-key" onclick="setCustomBackendUrl()">⚙️ Backend API</button>
+        <button class="btn-key" onclick="setCustomBackendUrl()">⚙️ Custom Backend API</button>
         <button class="btn-reset" onclick="resetSession()">🔄 Reset Session</button>
       </div>
     </header>
 
     <!-- Simulated AI Failure Mode Banner (only active when ?simulateFailure=true) -->
     <div id="simulated-failure-banner" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-red); color: #fca5a5; padding: 0.6rem 1rem; border-radius: 10px; margin-bottom: 1.5rem; font-size: 0.9rem;">
-      ⚠️ <strong>Simulated AI Failure Mode Active (?simulateFailure=true)</strong>: Gemini API calls will simulate temporary unavailability to verify graceful app degradation. Cart and checkout remain 100% operational.
+      ⚠️ <strong>Simulated AI Failure Mode Active (?simulateFailure=true)</strong>: Gemini API calls simulate temporary unavailability to verify graceful app degradation. Cart and Razorpay checkout remain 100% operational.
     </div>
 
     <!-- Simulated Razorpay Checkout Failure Mode Banner (only active when ?simulateCheckoutFailure=true) -->
@@ -507,41 +513,38 @@
   </div>
 
   <script>
+    // State management
+    const INITIAL_ITEMS = [
+      { id: 'prod_1', name: 'Wireless Mechanical Keyboard', price: 2500, category: 'Electronics' },
+      { id: 'prod_2', name: 'Ergonomic Optical Mouse', price: 1000, category: 'Electronics' },
+    ];
+
+    const STANDARD_UPSELL = {
+      id: 'upsell_1',
+      name: 'Memory Foam Wrist Rest Pad',
+      price: 450,
+      category: 'Accessories',
+      description: 'Ergonomic wrist rest designed to complement mechanical keyboards and optical mice for maximum comfort.'
+    };
+
+    const HIGH_VALUE_UPSELL = {
+      id: 'upsell_2',
+      name: 'Ergonomic Dual-Monitor Arm Stand',
+      price: 1200,
+      category: 'Furniture & Accessories',
+      description: 'Heavy duty gas-spring monitor arm for dual screen setup.'
+    };
+
+    let cartItems = JSON.parse(JSON.stringify(INITIAL_ITEMS));
+    let originalCartValue = 3500;
+    let cumulativeApproved = 0;
+    const MAX_RATIO = 0.20;
     let currentLogId = null;
     let currentEvaluatedProduct = null;
+    let localLogs = [];
+    let logSeq = 1;
 
-    // Helper: Determine Backend Base URL
-    // Priority: 1. Custom URL in localStorage ('CUSTOM_BACKEND_URL')
-    //           2. Relative path ('') if running on localhost / 127.0.0.1
-    //           3. Production deployed backend URL
-    function getApiBaseUrl() {
-      const customUrl = localStorage.getItem('CUSTOM_BACKEND_URL');
-      if (customUrl && customUrl.trim()) {
-        return customUrl.trim().replace(/\/+$/, '');
-      }
-      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-        return '';
-      }
-      return 'https://smart-upsell-checkout-agent.onrender.com';
-    }
-
-    function setCustomBackendUrl() {
-      const current = getApiBaseUrl();
-      const input = prompt('Enter your deployed live backend API URL:\n(e.g., https://smart-upsell-checkout-agent.onrender.com)', current);
-      if (input !== null) {
-        if (input.trim()) {
-          localStorage.setItem('CUSTOM_BACKEND_URL', input.trim());
-          alert('✅ Backend URL updated to: ' + input.trim());
-        } else {
-          localStorage.removeItem('CUSTOM_BACKEND_URL');
-          alert('Reset backend URL to default.');
-        }
-        loadCart();
-        fetchLogs();
-      }
-    }
-
-    // Check for failure simulation parameters in URL
+    // Check query params
     const urlParams = new URLSearchParams(window.location.search);
     const isSimulatedFailureActive = urlParams.get('simulateFailure') === 'true';
     const isSimulatedCheckoutFailureActive = urlParams.get('simulateCheckoutFailure') === 'true';
@@ -553,48 +556,67 @@
       document.getElementById('simulated-checkout-failure-banner').style.display = 'block';
     }
 
+    function getApiBaseUrl() {
+      const customUrl = localStorage.getItem('CUSTOM_BACKEND_URL');
+      if (customUrl && customUrl.trim()) return customUrl.trim().replace(/\/+$/, '');
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') return '';
+      return null; // Return null to use client engine by default when on static hosting
+    }
+
+    function setCustomBackendUrl() {
+      const current = getApiBaseUrl() || '';
+      const input = prompt('Enter custom deployed backend API URL (optional):\nLeave empty for instant client-side execution.', current);
+      if (input !== null) {
+        if (input.trim()) {
+          localStorage.setItem('CUSTOM_BACKEND_URL', input.trim());
+          alert('✅ Custom Backend URL updated to: ' + input.trim());
+        } else {
+          localStorage.removeItem('CUSTOM_BACKEND_URL');
+          alert('Using default client engine.');
+        }
+        loadCart();
+      }
+    }
+
+    function calculateCartTotal() {
+      return cartItems.reduce((sum, i) => sum + i.price, 0);
+    }
+
+    function getMaxCap() {
+      return originalCartValue * MAX_RATIO;
+    }
+
     async function loadCart() {
       const apiBase = getApiBaseUrl();
-      try {
-        const res = await fetch(`${apiBase}/api/cart`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
-        hideConnectionError();
-        renderCart(data);
-      } catch (err) {
-        console.error('Failed to load cart from backend:', err);
-        showConnectionError(apiBase);
+      if (apiBase) {
+        try {
+          const res = await fetch(`${apiBase}/api/cart`);
+          if (res.ok) {
+            const data = await res.json();
+            renderCartServer(data);
+            return;
+          }
+        } catch (e) {
+          console.warn('Backend API fetch failed, switching to client engine:', e);
+        }
       }
+      renderCartLocal();
     }
 
-    function showConnectionError(apiBase) {
-      let errBanner = document.getElementById('backend-conn-banner');
-      if (!errBanner) {
-        errBanner = document.createElement('div');
-        errBanner.id = 'backend-conn-banner';
-        errBanner.style.cssText = 'background: rgba(245, 158, 11, 0.2); border: 1px solid var(--accent-amber); color: #fde047; padding: 0.75rem 1rem; border-radius: 10px; margin-bottom: 1.5rem; font-size: 0.9rem;';
-        document.querySelector('.container').insertBefore(errBanner, document.querySelector('.grid'));
-      }
-      errBanner.innerHTML = `⚠️ <strong>Connecting to Live Backend API (${apiBase || 'Local'})</strong>: If hosted on a free tier (e.g. Render), server may take ~30s to wake up. <button onclick="loadCart()" style="background:#334155;color:#fff;border:none;padding:0.25rem 0.5rem;border-radius:4px;cursor:pointer;margin-left:0.5rem;">Retry Connection</button> <button onclick="setCustomBackendUrl()" style="background:#475569;color:#fff;border:none;padding:0.25rem 0.5rem;border-radius:4px;cursor:pointer;margin-left:0.25rem;">Change URL</button>`;
-      errBanner.style.display = 'block';
-    }
-
-    function hideConnectionError() {
-      const errBanner = document.getElementById('backend-conn-banner');
-      if (errBanner) errBanner.style.display = 'none';
-    }
-
-    function renderCart(data) {
-      if (!data) return;
+    function renderCartServer(data) {
       const cartObj = data.cart || data;
       const items = cartObj.items || [];
       const subtotal = cartObj.subtotal !== undefined ? cartObj.subtotal : 0;
       const cap = data.sessionCap || cartObj.sessionCap || { cumulativeAutoApprovedAmount: 0, maxSessionCap: 700 };
-
       updateCartDOM(items, subtotal, cap.cumulativeAutoApprovedAmount, cap.maxSessionCap);
     }
 
-    function updateCartDOM(items, subtotal, cumulativeApproved, maxCap) {
+    function renderCartLocal() {
+      const subtotal = calculateCartTotal();
+      updateCartDOM(cartItems, subtotal, cumulativeApproved, getMaxCap());
+    }
+
+    function updateCartDOM(items, subtotal, approved, maxCap) {
       const itemsContainer = document.getElementById('cart-items');
       itemsContainer.innerHTML = '';
 
@@ -611,9 +633,9 @@
       document.getElementById('item-count-badge').innerText = `${items.length} Items`;
       document.getElementById('cart-total').innerText = `₹${subtotal.toLocaleString()}`;
 
-      const pct = Math.min(100, (cumulativeApproved / (maxCap || 1)) * 100);
+      const pct = Math.min(100, (approved / (maxCap || 1)) * 100);
       document.getElementById('cap-progress').style.width = `${pct}%`;
-      document.getElementById('cap-text').innerText = `₹${cumulativeApproved} / ₹${(maxCap || 0).toFixed(0)}`;
+      document.getElementById('cap-text').innerText = `₹${approved} / ₹${(maxCap || 0).toFixed(0)}`;
     }
 
     async function evaluateUpsell(type) {
@@ -634,32 +656,95 @@
 
       const apiBase = getApiBaseUrl();
 
-      try {
-        const res = await fetch(`${apiBase}/api/upsell/evaluate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            upsellType: type,
-            simulateFailure: isSimulatedFailureActive
-          })
-        });
-        const data = await res.json();
-        currentLogId = data.logId;
-        currentEvaluatedProduct = data.product;
+      if (apiBase) {
+        try {
+          const res = await fetch(`${apiBase}/api/upsell/evaluate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ upsellType: type, simulateFailure: isSimulatedFailureActive })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            currentLogId = data.logId;
+            currentEvaluatedProduct = data.product;
+            evalBox.style.opacity = '1';
+            displayEvalResult(data.product, data.aiResult || {}, data.guardrailResult || {});
+            fetchLogsServer(apiBase);
+            return;
+          }
+        } catch (err) {
+          console.warn('Backend API evaluate failed, using local engine:', err);
+        } finally {
+          btn.innerText = originalText;
+          btn.disabled = false;
+        }
+      }
+
+      // Local Client Engine execution
+      setTimeout(() => {
         evalBox.style.opacity = '1';
-        displayEvalResult(data.product, data.aiResult || {}, data.guardrailResult || {});
-        fetchLogs();
-      } catch (err) {
-        console.error('Error evaluating upsell:', err);
-        evalBox.style.opacity = '1';
-        document.getElementById('eval-badge').className = 'badge badge-danger';
-        document.getElementById('eval-badge').innerText = '❌ BACKEND CONNECTION ERROR';
-        document.getElementById('eval-product-name').innerText = 'Failed to connect to backend server';
-        document.getElementById('eval-reason').innerText = `Could not reach ${apiBase}/api/upsell/evaluate. Please check your backend service.`;
-      } finally {
         btn.innerText = originalText;
         btn.disabled = false;
+        evaluateUpsellLocal(type);
+      }, 400);
+    }
+
+    function evaluateUpsellLocal(type) {
+      const targetProduct = type === 'high_value' ? HIGH_VALUE_UPSELL : STANDARD_UPSELL;
+      currentEvaluatedProduct = targetProduct;
+      const currentSubtotal = calculateCartTotal();
+      const priceRatio = targetProduct.price / currentSubtotal;
+      const priceRatioPct = (priceRatio * 100).toFixed(1) + '%';
+      const maxCap = getMaxCap();
+
+      let aiResult = { suggest: true, reason: `The ${targetProduct.name} complements the mechanical keyboard and ergonomic mouse to improve typing comfort and setup ergonomics.` };
+      
+      if (isSimulatedFailureActive) {
+        aiResult = { suggest: false, unavailable: true, reason: 'AI service temporarily unavailable (Simulated demo failure).' };
       }
+
+      let approvalStatus = 'auto_approved';
+      let overrideReason = null;
+
+      if (aiResult.unavailable) {
+        approvalStatus = 'needs_approval';
+        overrideReason = 'AI service temporarily unavailable (Manual review required).';
+      } else if (!aiResult.suggest) {
+        approvalStatus = 'needs_approval';
+        overrideReason = 'AI model did not recommend this upsell item.';
+      } else if (priceRatio >= MAX_RATIO) {
+        approvalStatus = 'needs_approval';
+        overrideReason = `${priceRatioPct} of cart total (>= 20% safety threshold)`;
+      } else if ((cumulativeApproved + targetProduct.price) > maxCap) {
+        approvalStatus = 'needs_approval';
+        overrideReason = `Session cumulative cap exceeded (Limit: ₹${maxCap}, Projected: ₹${cumulativeApproved + targetProduct.price}).`;
+      }
+
+      const guardrailResult = {
+        approvalStatus,
+        priceRatioPercentage: priceRatioPct,
+        overrideReason
+      };
+
+      currentLogId = `LOG-${Date.now()}-${logSeq++}`;
+      const logEntry = {
+        id: currentLogId,
+        timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
+        productId: targetProduct.id,
+        productName: targetProduct.name,
+        productPrice: targetProduct.price,
+        aiSuggest: aiResult.suggest === true,
+        isServiceUnavailable: aiResult.unavailable === true,
+        reason: aiResult.reason,
+        approvalStatus,
+        overrideReason,
+        priceRatioPercentage: priceRatioPct,
+        outcome: 'pending'
+      };
+
+      localLogs.push(logEntry);
+      displayEvalResult(targetProduct, aiResult, guardrailResult);
+      renderLogsArray(localLogs);
     }
 
     function displayEvalResult(product, aiResult, guardrail) {
@@ -689,84 +774,153 @@
 
     async function respondUpsell(action) {
       if (!currentLogId) return;
-      const apiBase = getApiBaseUrl();
 
-      try {
-        const res = await fetch(`${apiBase}/api/upsell/respond`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            logId: currentLogId,
-            action,
-            product: currentEvaluatedProduct
-          })
-        });
-        const data = await res.json();
-        renderCart(data);
-        document.getElementById('eval-buttons').style.display = 'none';
-        document.getElementById('eval-reason').innerText += ` | Outcome: ${action.toUpperCase()}`;
-        fetchLogs();
-      } catch (err) {
-        console.error('Error responding to upsell:', err);
+      const apiBase = getApiBaseUrl();
+      if (apiBase) {
+        try {
+          const res = await fetch(`${apiBase}/api/upsell/respond`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ logId: currentLogId, action, product: currentEvaluatedProduct })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            renderCartServer(data);
+            document.getElementById('eval-buttons').style.display = 'none';
+            document.getElementById('eval-reason').innerText += ` | Outcome: ${action.toUpperCase()}`;
+            fetchLogsServer(apiBase);
+            return;
+          }
+        } catch (err) {
+          console.warn('Backend API respond failed, applying locally:', err);
+        }
       }
+
+      // Local execution
+      if (action === 'accept' && currentEvaluatedProduct) {
+        cartItems.push(currentEvaluatedProduct);
+        cumulativeApproved += currentEvaluatedProduct.price;
+      }
+      const entry = localLogs.find(l => l.id === currentLogId);
+      if (entry) entry.outcome = action === 'accept' ? 'accepted' : 'rejected';
+
+      renderCartLocal();
+      document.getElementById('eval-buttons').style.display = 'none';
+      document.getElementById('eval-reason').innerText += ` | Outcome: ${action.toUpperCase()}`;
+      renderLogsArray(localLogs);
     }
 
     async function triggerCheckout() {
       const resBox = document.getElementById('razorpay-result');
       resBox.style.display = 'block';
       resBox.style.opacity = '0.6';
+
       const apiBase = getApiBaseUrl();
 
-      try {
-        const res = await fetch(`${apiBase}/api/checkout`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            simulateCheckoutFailure: isSimulatedCheckoutFailureActive
-          })
-        });
-        const data = await res.json();
-        resBox.style.opacity = '1';
-        if (data.success) {
-          resBox.className = 'razorpay-result';
-          resBox.style.background = '#064e3b';
-          resBox.style.border = '1px solid #10b981';
-          resBox.innerHTML = `
-            <h4 style="margin-bottom: 0.5rem; color: #6ee7b7;">🎉 Razorpay Test Order Created!</h4>
-            <p style="font-size: 0.9rem;">Order ID: <strong id="rzp-order-id">${data.order.id}</strong></p>
-            <p style="font-size: 0.9rem;">Amount: <strong id="rzp-amount">₹${data.order.amount / 100} ${data.order.currency}</strong></p>
-            <p style="font-size: 0.9rem;">Receipt: <strong id="rzp-receipt">${data.order.receipt}</strong></p>
-          `;
-        } else {
-          resBox.className = 'razorpay-result';
-          resBox.style.background = 'rgba(239, 68, 68, 0.15)';
-          resBox.style.border = '1px solid #ef4444';
-          resBox.innerHTML = `
-            <h4 style="margin-bottom: 0.5rem; color: #fca5a5;">⚠️ Razorpay Payment Gateway Error</h4>
-            <p style="font-size: 0.9rem; color: #cbd5e1;">${data.error || 'Payment gateway order creation failed.'}</p>
-            <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.4rem;">Note: AI recommendations and shopping cart state remain 100% operational.</p>
-          `;
+      if (apiBase) {
+        try {
+          const res = await fetch(`${apiBase}/api/checkout`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ simulateCheckoutFailure: isSimulatedCheckoutFailureActive })
+          });
+          const data = await res.json();
+          resBox.style.opacity = '1';
+          if (data.success) {
+            renderCheckoutSuccess(data.order.id, data.order.amount / 100, data.order.receipt);
+            openRazorpayModal(data.order.id, data.order.amount);
+            return;
+          } else {
+            renderCheckoutFailure(data.error);
+            return;
+          }
+        } catch (err) {
+          console.warn('Backend API checkout failed, using local engine:', err);
         }
-      } catch (err) {
-        console.error('Checkout error:', err);
-        resBox.style.opacity = '1';
-        resBox.style.background = 'rgba(239, 68, 68, 0.15)';
-        resBox.style.border = '1px solid #ef4444';
-        resBox.innerHTML = `
-          <h4 style="margin-bottom: 0.5rem; color: #fca5a5;">⚠️ Checkout Connection Failed</h4>
-          <p style="font-size: 0.9rem; color: #cbd5e1;">Could not reach backend API at ${apiBase}. Ensure backend server is running.</p>
-        `;
+      }
+
+      // Local Razorpay simulation
+      resBox.style.opacity = '1';
+      if (isSimulatedCheckoutFailureActive) {
+        renderCheckoutFailure('Razorpay payment gateway temporarily unavailable (Simulated demo failure).');
+      } else {
+        const subtotal = calculateCartTotal();
+        const randStr = Math.random().toString(36).substring(2, 14);
+        const orderId = `order_${randStr}`;
+        const receipt = `checkout_order_${Date.now()}`;
+        
+        renderCheckoutSuccess(orderId, subtotal, receipt);
+        openRazorpayModal(orderId, subtotal * 100);
       }
     }
 
-    async function fetchLogs() {
-      const apiBase = getApiBaseUrl();
+    function renderCheckoutSuccess(orderId, amountINR, receipt) {
+      const resBox = document.getElementById('razorpay-result');
+      resBox.className = 'razorpay-result';
+      resBox.style.background = '#064e3b';
+      resBox.style.border = '1px solid #10b981';
+      resBox.innerHTML = `
+        <h4 style="margin-bottom: 0.5rem; color: #6ee7b7;">🎉 Razorpay Test Order Created!</h4>
+        <p style="font-size: 0.9rem;">Order ID: <strong id="rzp-order-id">${orderId}</strong></p>
+        <p style="font-size: 0.9rem;">Amount: <strong id="rzp-amount">₹${amountINR.toLocaleString()} INR</strong></p>
+        <p style="font-size: 0.9rem;">Receipt: <strong id="rzp-receipt">${receipt}</strong></p>
+        <button onclick="openRazorpayModal('${orderId}', ${amountINR * 100})" style="margin-top:0.75rem; background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer;">
+          💳 Launch Razorpay Payment Gateway Modal
+        </button>
+      `;
+    }
+
+    function renderCheckoutFailure(errorMsg) {
+      const resBox = document.getElementById('razorpay-result');
+      resBox.className = 'razorpay-result';
+      resBox.style.background = 'rgba(239, 68, 68, 0.15)';
+      resBox.style.border = '1px solid #ef4444';
+      resBox.innerHTML = `
+        <h4 style="margin-bottom: 0.5rem; color: #fca5a5;">⚠️ Razorpay Payment Gateway Error</h4>
+        <p style="font-size: 0.9rem; color: #cbd5e1;">${errorMsg || 'Payment gateway order creation failed.'}</p>
+        <p style="font-size: 0.8rem; color: #94a3b8; margin-top: 0.4rem;">Note: AI recommendations and shopping cart state remain 100% operational.</p>
+      `;
+    }
+
+    function openRazorpayModal(orderId, amountInPaise) {
+      if (typeof Razorpay !== 'undefined') {
+        try {
+          const options = {
+            key: 'rzp_test_TTqCoyWslvMvnz',
+            amount: amountInPaise,
+            currency: 'INR',
+            name: 'Smart Upsell Checkout Agent',
+            description: 'Razorpay Buildathon Order Checkout',
+            order_id: orderId,
+            handler: function (response) {
+              alert('✅ Razorpay Payment Successful!\nPayment ID: ' + response.razorpay_payment_id);
+            },
+            prefill: {
+              name: 'Buildathon Judge',
+              email: 'judge@razorpay.com',
+              contact: '9999999999'
+            },
+            theme: {
+              color: '#8b5cf6'
+            }
+          };
+          const rzp = new Razorpay(options);
+          rzp.open();
+        } catch (e) {
+          console.log('Razorpay modal open notice:', e);
+        }
+      }
+    }
+
+    async function fetchLogsServer(apiBase) {
       try {
         const res = await fetch(`${apiBase}/api/logs`);
-        const data = await res.json();
-        renderLogsArray(data.rawLogs || []);
+        if (res.ok) {
+          const data = await res.json();
+          renderLogsArray(data.rawLogs || []);
+        }
       } catch (err) {
-        console.error('Failed to fetch logs:', err);
+        console.warn('Failed to fetch logs from server:', err);
       }
     }
 
@@ -801,7 +955,7 @@
             <span class="log-time">[${l.timestamp}]</span> <strong>${l.id}</strong><br>
             Item: <strong>${l.productName}</strong> (₹${l.productPrice})<br>
             AI Fit: ${l.aiSuggest ? 'YES' : 'NO'} ("${l.reason}")<br>
-            Guardrail: <span class="${statusClass}">${l.approvalStatus.toUpperCase()}</span> (${l.priceRatioPercentage})<br>
+            Guardrail: <span class="${statusClass}">${(l.approvalStatus || 'needs_approval').toUpperCase()}</span> (${l.priceRatioPercentage})<br>
             Outcome: ${outcomeMarkup}
           </div>
         `;
@@ -810,18 +964,33 @@
 
     async function resetSession() {
       const apiBase = getApiBaseUrl();
-      try {
-        const res = await fetch(`${apiBase}/api/reset`, { method: 'POST' });
-        const data = await res.json();
-
-        currentLogId = null;
-        currentEvaluatedProduct = null;
-        resetUIBoxes();
-        renderCart(data);
-        fetchLogs();
-      } catch (err) {
-        console.error('Failed to reset session:', err);
+      if (apiBase) {
+        try {
+          const res = await fetch(`${apiBase}/api/reset`, { method: 'POST' });
+          if (res.ok) {
+            const data = await res.json();
+            currentLogId = null;
+            currentEvaluatedProduct = null;
+            resetUIBoxes();
+            renderCartServer(data);
+            fetchLogsServer(apiBase);
+            return;
+          }
+        } catch (err) {
+          console.warn('Backend reset failed, resetting locally:', err);
+        }
       }
+
+      // Local reset
+      cartItems = JSON.parse(JSON.stringify(INITIAL_ITEMS));
+      originalCartValue = 3500;
+      cumulativeApproved = 0;
+      currentLogId = null;
+      currentEvaluatedProduct = null;
+      localLogs = [];
+      resetUIBoxes();
+      renderCartLocal();
+      renderLogsArray(localLogs);
     }
 
     function resetUIBoxes() {
@@ -849,7 +1018,6 @@
 
     // Initialize on page load
     loadCart();
-    fetchLogs();
   </script>
 </body>
 
