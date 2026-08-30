@@ -34,21 +34,25 @@
 
     html {
       overflow-y: auto !important;
-      overflow-x: hidden;
+      overflow-x: hidden !important;
       scroll-behavior: smooth;
-      height: auto;
-      min-height: 100%;
+      height: auto !important;
+      min-height: 100% !important;
+      touch-action: pan-y !important;
+      -webkit-overflow-scrolling: touch !important;
     }
 
     body {
       font-family: 'Outfit', sans-serif;
       background-color: var(--bg-dark);
       color: var(--text-main);
-      min-height: 100vh;
-      height: auto;
+      min-height: 100vh !important;
+      height: auto !important;
       overflow-y: auto !important;
-      overflow-x: hidden;
-      padding: 2rem 1rem 4rem 1rem;
+      overflow-x: hidden !important;
+      touch-action: pan-y !important;
+      -webkit-overflow-scrolling: touch !important;
+      padding: 2rem 1rem 6rem 1rem;
       position: relative;
     }
 
@@ -365,8 +369,10 @@
       border-radius: 12px;
       padding: 1rem;
       max-height: 350px;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
+      overflow-y: auto !important;
+      touch-action: pan-y !important;
+      -webkit-overflow-scrolling: touch !important;
+      overscroll-behavior: contain;
       color: #cbd5e1;
     }
 
@@ -526,14 +532,6 @@
   </div>
 
   <script>
-    // Ensure body & html remain scrollable at all times
-    setInterval(() => {
-      if (document.body.style.overflow === 'hidden' && !document.querySelector('.razorpay-checkout-frame')) {
-        document.body.style.overflow = 'auto';
-        document.documentElement.style.overflow = 'auto';
-      }
-    }, 500);
-
     // Automatically purge any stale legacy backend URLs from localStorage
     try {
       const storedUrl = localStorage.getItem('CUSTOM_BACKEND_URL');
