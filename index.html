@@ -513,7 +513,15 @@
   </div>
 
   <script>
-    // State management
+    // Automatically purge any stale legacy backend URLs from localStorage
+    try {
+      const storedUrl = localStorage.getItem('CUSTOM_BACKEND_URL');
+      if (storedUrl && storedUrl.includes('onrender.com')) {
+        localStorage.removeItem('CUSTOM_BACKEND_URL');
+      }
+    } catch(e) {}
+
+    // State management constants
     const INITIAL_ITEMS = [
       { id: 'prod_1', name: 'Wireless Mechanical Keyboard', price: 2500, category: 'Electronics' },
       { id: 'prod_2', name: 'Ergonomic Optical Mouse', price: 1000, category: 'Electronics' },
@@ -590,7 +598,10 @@
       const apiBase = getApiBaseUrl();
       if (apiBase) {
         try {
-          const res = await fetch(`${apiBase}/api/cart`);
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 2000);
+          const res = await fetch(`${apiBase}/api/cart`, { signal: controller.signal });
+          clearTimeout(tid);
           if (res.ok) {
             const data = await res.json();
             renderCartServer(data);
@@ -658,11 +669,15 @@
 
       if (apiBase) {
         try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 3000);
           const res = await fetch(`${apiBase}/api/upsell/evaluate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ upsellType: type, simulateFailure: isSimulatedFailureActive })
+            body: JSON.stringify({ upsellType: type, simulateFailure: isSimulatedFailureActive }),
+            signal: controller.signal
           });
+          clearTimeout(tid);
           if (res.ok) {
             const data = await res.json();
             currentLogId = data.logId;
